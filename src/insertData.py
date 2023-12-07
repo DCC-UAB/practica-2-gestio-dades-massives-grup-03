@@ -35,19 +35,20 @@ class ImportOptions(ArgumentParser):
 
     super().add_argument("-C", "--columnClass", type=int, default=-1,
                          help="index to denote the column position of class label.")
-
+    # TODO insertar usuario de sql
     super().add_argument("--user", type=str, default=None, help="string with the user used to connect to the Oracle DB.")
     super().add_argument("--passwd", type=str, default=None,
                          help="string with the password used to connect to the Oracle DB.")
-    super().add_argument("--hostname", type=str, default="localhost",
+
+    super().add_argument("--hostname", type=str, default="oracle-1.grup03.GABD",
                          help="name of the Oracle Server you want to connect")
     super().add_argument("--port", type=str, default="1521", help="Oracle Port connection.")
     super().add_argument("--serviceName", type=str, default="orcl", help="Oracle Service Name")
 
-    super().add_argument("--ssh_tunnel", type=str, default=None,help="name of the Server you want to create a ssh tunnel")
+    super().add_argument("--ssh_tunnel", type=str, default="dcccluster.uab.es", help="name of the Server you want to create a ssh tunnel")
     super().add_argument("--ssh_user", type=str, default="student",  help="SSH user")
-    super().add_argument("--ssh_password", type=str, default=None, help="SSH password")
-    super().add_argument("--ssh_port", type=str, default="22", help="SSH port")
+    super().add_argument("--ssh_password", type=str, default="TuLLLh8bCiHj.", help="SSH password")
+    super().add_argument("--ssh_port", type=str, default="8195", help="SSH port")
 
 
 
