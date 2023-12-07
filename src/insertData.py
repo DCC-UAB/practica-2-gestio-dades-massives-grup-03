@@ -28,8 +28,8 @@ class ImportOptions(ArgumentParser):
             description="This script insert data from the UCI repositori."
         )
 
-        # super().add_argument("datasetName", type=str, default="3123", help="Name of the imported dataset.")
-        # super().add_argument("fileName", type=str, default="312312asd", help="file where data is stored.")
+        super().add_argument("datasetName", type=str, default=None, help="Name of the imported dataset.")
+        super().add_argument("fileName", type=str, default=None, help="file where data is stored.")
 
         super().add_argument("-C", "--columnClass", type=int, default=-1,
                              help="index to denote the column position of class label.")
@@ -66,18 +66,20 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
   """
 
     df, ids = readVectorDataFile(fileName, label_pos=label_pos)
-
     cur = dbConn.cursor()
+
     # Exemple de manipulacio de JSON
     info = {'description': 'Informació del dataset Iris'}
     var = cur.var(oracledb.DB_TYPE_JSON)
     var.setvalue(0, info)
+
     # Exemple de Blob
     blobFeatures = cur.var(oracledb.BLOB)
     a = np.array([0, 1, 2, 3])
     blobFeatures.setvalue(0, a.tobytes())
-    # TODO: Implementeu el codi necessari per fer la inserció de les dades a Oracle
 
+    # TODO: Implementeu el codi necessari per fer la inserció de les dades a Oracle
+    cur.execute()
     # FI TODO
 
     try:
@@ -99,9 +101,7 @@ if __name__ == '__main__':
     db = orcl(user=args.user, passwd=args.passwd, hostname=args.hostname, port=args.port,
               serviceName=args.serviceName, ssh=ssh_server)
 
-    print("Hola1")
     conn = db.open()
-    print("Hola2")
 
     if db.testConnection():
         logging.warning("La connexió a {} funciona correctament.".format(args.hostname))
