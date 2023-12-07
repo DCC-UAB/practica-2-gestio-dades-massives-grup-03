@@ -79,7 +79,31 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
     blobFeatures.setvalue(0, a.tobytes())
 
     # TODO: Implementeu el codi necessari per fer la inserció de les dades a Oracle
-    cur.execute()
+    def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwargs):
+        df, ids = readVectorDataFile(fileName, label_pos=label_pos)
+        cur = dbConn.cursor()
+
+        for index, row in df.iterrows():
+            # Convert features to BLOB
+            blobFeatures = cur.var(oracledb.BLOB)
+            features_np_array = np.array(row['features'])
+            blobFeatures.setvalue(0, features_np_array.tobytes())
+
+            # Insert data into SAMPLES table
+            try:
+                cur.execute(
+                    "INSERT INTO SAMPLES (NAMEDATASET, ID, FEATURES, LABEL) VALUES (:nameDataset, :id, :features, :label)",
+                    nameDataset=nameDataset, id=index, features=blobFeatures, label=row['class'])
+            except oracledb.DatabaseError as e:
+                print(f"An error occurred: {e}")
+                # Handle exceptions and possibly rollback transaction
+                dbConn.rollback()
+                return False
+
+        # If all inserts are successful, commit the transaction
+        dbConn.commit()
+        return True
+
     # FI TODO
 
     try:
