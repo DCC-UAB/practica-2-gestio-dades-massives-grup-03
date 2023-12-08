@@ -109,7 +109,6 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
         return False
 
 
-
 if __name__ == '__main__':
     # read commandline arguments, first
     args = ImportOptions().parse()
