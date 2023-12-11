@@ -17,41 +17,11 @@ import logging
 from argparse import ArgumentParser
 
 import oracledb
+
+from itertools import product
+from src.conn import get_conn
 from utils import readVectorDataFile
 from GABDConnect.oracleConnection import oracleConnection as orcl
-
-
-class ImportOptions(ArgumentParser):
-
-    def __init__(self):
-        super().__init__(
-            description="This script insert data from the UCI repositori."
-        )
-
-        super().add_argument("datasetName", type=str, default=None, help="Name of the imported dataset.")
-        super().add_argument("fileName", type=str, default=None, help="file where data is stored.")
-
-        super().add_argument("-C", "--columnClass", type=int, default=-1,
-                             help="index to denote the column position of class label.")
-
-        super().add_argument("--user", type=str, default="GestorUCI",
-                             help="string with the user used to connect to the Oracle DB.")
-        super().add_argument("--passwd", type=str, default="33",
-                             help="string with the password used to connect to the Oracle DB.")
-
-        super().add_argument("--hostname", type=str, default="oracle-1.grup03.GABD",
-                             help="name of the Oracle Server you want to connect")
-        super().add_argument("--port", type=str, default="1521", help="Oracle Port connection.")
-        super().add_argument("--serviceName", type=str, default="orcl", help="Oracle Service Name")
-
-        super().add_argument("--ssh_tunnel", type=str, default="dcccluster.uab.cat",
-                             help="name of the Server you want to create a ssh tunnel")
-        super().add_argument("--ssh_user", type=str, default="student", help="SSH user")
-        super().add_argument("--ssh_password", type=str, default="TuLLLh8bCiHj.", help="SSH password")
-        super().add_argument("--ssh_port", type=str, default="8195", help="SSH port")
-
-    def parse(self):
-        return super().parse_args()
 
 
 def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwargs):
@@ -95,10 +65,42 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
 
             cur.execute(None, [nameDataset, index, blobFeatures, row['class']])
 
-        confirm = "Datos insertados correctamente en el nuevo dataset."
+        confirm = "Datos insertados correctamente en el nuevo dataset"
     else:
-        confirm = f"El dataset {nameDataset} ya existe, no se realizaron inserciones."
+        confirm = "El dataset {nameDataset} ya existe, no se realizaron inserciones"
 
+    Algorithms = {
+        'Support Vector Machines': 'SVC',
+        'K nearest Neighbor': 'KNN',
+        'Random Forest': 'RFC'
+    }
+    params = {
+        'SVC': {'kernel': ("linear", "rbf", "poly"), 'gamma': [1, 5, 10, 20]},
+        'KNN': {'n_neighbors': [3, 5, 10, 15]},
+        'RFC': {
+            'max_depth': [2, 4, 10, None],
+            'criterion': ['gini', 'entropy', 'log_loss']}
+    }
+
+    cur.execute("SELECT COUNT(*) FROM CLASSIFICADOR WHERE NOMCURT = :1", [Algorithms['Support Vector Machines']])
+    exist = cur.fetchone()[0] != 0
+    if not exist:
+        for x, y in Algorithms.items():
+            cur.prepare("INSERT INTO CLASSIFICADOR (NOMCURT, NOM) VALUES (:1, :2)")
+            cur.execute(None, [y, x])
+            c_params = params[y].keys()
+            for idx, values in enumerate(product(*params[y].values())):
+                cp = {k: v for k, v in zip(c_params, values) if v is not None}
+                cur.prepare("INSERT INTO PARAMETRES (NOMCURT, HASH, VALORS) VALUES (:1, :2, :3)")
+                cp_hashable = tuple(sorted(cp.items()))
+                hash_valors = hash(cp_hashable)
+                valors = cp
+                var = cur.var(oracledb.DB_TYPE_JSON)
+                var.setvalue(0, valors)
+                cur.execute(None, [y, hash_valors, var])
+        confirm += " y datos de classificador insertados"
+    else:
+        confirm += " y classificadores ya existen"
     # Intentar hacer commit y manejar excepciones
     try:
         dbConn.commit()
@@ -110,21 +112,7 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
 
 
 if __name__ == '__main__':
-    # read commandline arguments, first
-    args = ImportOptions().parse()
-
-    # Inicialitzem el diccionari amb les dades de connexió SSH per fer el tunel
-    ssh_server = {'ssh': args.ssh_tunnel, 'user': args.ssh_user,
-                  'pwd': args.ssh_password, 'port': args.ssh_port} if args.ssh_tunnel is not None else None
-
-    # Cridem el constructor i obrim la connexió
-    db = orcl(user=args.user, passwd=args.passwd, hostname=args.hostname, port=args.port,
-              serviceName=args.serviceName, ssh=ssh_server)
-
-    conn = db.open()
-
-    if db.testConnection():
-        logging.warning("La connexió a {} funciona correctament.".format(args.hostname))
+    db, args = get_conn()
 
     if args.datasetName:
         res = insertVectorDataset(db, args.datasetName, args.fileName, args.columnClass)
