@@ -13,10 +13,29 @@ from sklearn.metrics import accuracy_score
 from datetime import datetime
 import socket
 from itertools import product
-from conn import get_conn, hash_items
+from conn import get_conn
 
 import oracledb
 from GABDConnect.oracleConnection import oracleConnection as orcl
+
+
+def insert_results(db_conn, nameDataset, classifier, parametres, iteration, time, fi_score, accuracy):
+    try:
+        cur = db_conn.cursor()
+        cur.execute("DELETE FROM GestorUCI.REPETICIO WHERE NAMEDATASET =:1", [nameDataset])
+        cur.prepare("INSERT INTO GestorUCI.REPETICIO (NAMEDATASET, NUM) VALUES (:1, :2)")
+        cur.execute(None, [nameDataset, iteration])
+        cur.prepare(
+            "INSERT INTO GestorUCI.EXPERIMENT (NAMEDATASET, NOMCURT, PAR_HASH, REP_NUM, DATA, ACCURACY, F_SCORE) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD/MM/YYYY HH24:MI'), :6, :7)")
+        cp_hashable = tuple(sorted(parametres.items()))
+        hash_valors = hash(cp_hashable)
+        cur.execute(None, [nameDataset, classifier, hash_valors, iteration, time, accuracy, fi_score])
+        db_conn.commit()
+        print("Resultados insertados correctamente.")
+
+    except Exception as e:
+        print(f"Error al insert resultados: {e}")
+
 
 if __name__ == "__main__":
 
@@ -59,14 +78,6 @@ if __name__ == "__main__":
 
         cp = params[args.alg]
         clf = Algorithms[args.alg](**cp)
-        hash_param = hash_items(cp)
-        nameDataset = args.datasetName
-        cur = db_write.cursor()
-        cur.execute("DELETE FROM GestorUCI.REPETICIO WHERE NAMEDATASET =:1", [nameDataset])
-
-        # TODO EN VERDAD SE TENIA QUE HACER CON TODOS LOS ALGORITMOS
-        # TODO ALMACENAR CADA
-        #
         for i in range(numIterations):
             order = np.random.permutation(n_sample)
             X = Xo[order]
@@ -85,17 +96,10 @@ if __name__ == "__main__":
             acc = accuracy_score(y_test, y_pred)
             print('Insert number:', i)
             # def insert_results(db_conn, nameDataset, classifier, parametres, iteration, time, fi_score, accuracy):
-            try:
-                cur.prepare("INSERT INTO GestorUCI.REPETICIO (NAMEDATASET, NUM) VALUES (:1, :2)")
-                cur.execute(None, [nameDataset, i])
-                cur.prepare(
-                    "INSERT INTO GestorUCI.EXPERIMENT (NAMEDATASET, NOMCURT, PAR_HASH, REP_NUM, DATA, ACCURACY, F_SCORE) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD/MM/YYYY HH24:MI'), :6, :7)")
-                cur.execute(None, [nameDataset, args.alg, hash_param, i, current_time, acc, f_score])
-                db_write.commit()
-                print("Resultados insertados correctamente.")
-
-            except Exception as e:
-                print(f"Error al insert resultados: {e}")
+            insert_results(db_write, args.datasetName, args.alg, cp, i, current_time, f_score, acc)
+            print(
+                "Classificador: {}, Iteracio: {}, paràmetres: {}, time: {}, f-score: {}, accuracy: {}"
+                .format(args.alg, i, cp, current_time, f_score, acc))
 
     finally:
         if db_write is not None:

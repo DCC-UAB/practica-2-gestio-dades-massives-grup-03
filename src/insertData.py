@@ -9,7 +9,6 @@ Created on 3/10/2022
 @author: Oriol Ramos Terrades (oriol.ramos@cuab.cat)
 @Institution: Computer Science Dept. - Universitat Autònoma de Barcelona
 '''
-
 import sys
 import numpy as np
 
@@ -19,7 +18,7 @@ from argparse import ArgumentParser
 import oracledb
 
 from itertools import product
-from src.conn import get_conn
+from src.conn import get_conn, hash_items
 from utils import readVectorDataFile
 from GABDConnect.oracleConnection import oracleConnection as orcl
 
@@ -92,12 +91,10 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
             for idx, values in enumerate(product(*params[y].values())):
                 cp = {k: v for k, v in zip(c_params, values) if v is not None}
                 cur.prepare("INSERT INTO PARAMETRES (NOMCURT, HASH, VALORS) VALUES (:1, :2, :3)")
-                cp_hashable = tuple(sorted(cp.items()))
-                hash_valors = hash(cp_hashable)
                 valors = cp
                 var = cur.var(oracledb.DB_TYPE_JSON)
                 var.setvalue(0, valors)
-                cur.execute(None, [y, hash_valors, var])
+                cur.execute(None, [y, hash_items(cp), var])
         confirm += " y datos de classificador insertados"
     else:
         confirm += " y classificadores ya existen"
