@@ -22,7 +22,14 @@ import oracledb
 from GABDConnect.oracleConnection import oracleConnection as orcl
 
 if __name__ == "__main__":
-
+    """
+        Els únics arguments necessaris seran --datasetName, pel nom del dataset on volem fer els experiments
+        Totes les opcions:
+        --datasetName Iris          
+        --datasetName BreastCancer  
+        --datasetName Ionosphere    
+        --datasetName letter       
+    """
     db_write, args = get_conn("DevUCI")
     numIterations = 50
     shortName = {

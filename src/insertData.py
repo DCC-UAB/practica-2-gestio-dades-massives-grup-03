@@ -60,8 +60,9 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
         cur.prepare("INSERT INTO Samples (NAMEDATASET, ID, FEATURES, LABEL) VALUES (:1, :2, :3, :4)")
         for index, row in df.iterrows():
             blobFeatures = cur.var(oracledb.BLOB)
+            # BreastCancer has the first column the ids of the pacients, which is irrelevant to the experiments
             if nameDataset == "BreastCancer":
-                features_np_array = np.array(row['features'].split(',')[1:], dtype=np.float32)
+                features_np_array = np.array([float(item) for item in row['features'][1:]], dtype=np.float64)
             else:
                 features_np_array = np.array(row['features'])
             blobFeatures.setvalue(0, features_np_array.tobytes())
@@ -113,6 +114,15 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
 
 
 if __name__ == '__main__':
+    """
+        Els únics arguments necessaris seran --datasetName, pel nom del dataset; --fileName, per la ubicació del 
+        dataset i -C, per la ubicació del la label
+        Totes les opcions:
+        --datasetName Iris          --fileName dataset/iris.data.txt                    -C -1
+        --datasetName BreastCancer  --fileName dataset/breast-cancer-wisconsin.data.txt -C -1
+        --datasetName Ionosphere    --fileName dataset/ionosphere.data.txt              -C -1 
+        --datasetName letter        --fileName dataset/letter-recognition.txt           -C 0
+    """
     db, args = get_conn()
 
     if args.datasetName:
