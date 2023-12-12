@@ -60,7 +60,7 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
         cur.prepare("INSERT INTO Samples (NAMEDATASET, ID, FEATURES, LABEL) VALUES (:1, :2, :3, :4)")
         for index, row in df.iterrows():
             blobFeatures = cur.var(oracledb.BLOB)
-            # BreastCancer has the first column the ids of the pacients, which is irrelevant to the experiments
+            # La primera columna es la id dels pacients, son irrelevants per als experiments
             if nameDataset == "BreastCancer":
                 features_np_array = np.array([float(item) for item in row['features'][1:]], dtype=np.float64)
             else:

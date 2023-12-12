@@ -37,13 +37,6 @@ class ImportOptions(ArgumentParser):
         super().add_argument("--ssh_password", type=str, default="TuLLLh8bCiHj.", help="SSH password")
         super().add_argument("--ssh_port", type=str, default="8195", help="SSH port")
 
-        super().add_argument("--alg", choices=['SVC', 'KNN', 'RFC'], type=str, default="SVC", help="Algo")
-        super().add_argument("--kernel", choices=['linear', 'rbf', 'poly'], type=str, default="linear", help="Only valid for SVC")
-        super().add_argument("--gamma", choices=[1, 5, 10, 20], type=int, default=1, help="Only valid for SVC")
-        super().add_argument("--n_neighbors", choices=[3, 5, 10, 15], type=int, default=3, help="Only valid for KNN")
-        super().add_argument("--max_depth", choices=[2, 4, 10, None], type=int, default=None, help="Only valid for RFC")
-        super().add_argument("--criterion", choices=['gini', 'entropy', 'log_loss'], type=str, default="gini", help="Only valid for RFC")
-
     def parse(self):
         return super().parse_args()
 
