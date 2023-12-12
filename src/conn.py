@@ -15,8 +15,8 @@ class ImportOptions(ArgumentParser):
             description="This script insert data from the UCI repositori."
         )
 
-        super().add_argument("datasetName", type=str, default=None, help="Name of the imported dataset.")
-        super().add_argument("fileName", type=str, default=None, help="file where data is stored.")
+        super().add_argument("--datasetName", type=str, default="Iris", help="Name of the imported dataset.")
+        super().add_argument("--fileName", type=str, default="dataset/iris.data.txt", help="file where data is stored.")
 
         super().add_argument("-C", "--columnClass", type=int, default=-1,
                              help="index to denote the column position of class label.")
@@ -73,7 +73,6 @@ def get_conn(user_fallback: str = "GestorUCI", password_fallback: str = "33"):
         raise SystemExit("error while connecting to the db")
 
     return db, args
-
 
 def hash_items(cp) -> str:
     cp_hashable = tuple(sorted(cp.items()))

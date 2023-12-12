@@ -1,8 +1,11 @@
 import logging
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import datasets
+from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.neighbors import KNeighborsClassifier as KNN
@@ -22,80 +25,82 @@ if __name__ == "__main__":
 
     db_write, args = get_conn("DevUCI")
     numIterations = 50
+    shortName = {
+        'SVC': 'SVC',
+        'KNeighborsClassifier': 'KNN',
+        'RandomForestClassifier': 'RFC'
+    }
     Algorithms = {
-        'SVC': SVC,
-        'KNN': KNN,
-        'RFC': RFC
+        'Support Vector Machines': SVC,
+        'K nearest Neighbor': KNN,
+        'Random Forest': RFC
     }
     params = {
-        'SVC': {'kernel': args.kernel, 'gamma': args.gamma},
-        'KNN': {'n_neighbors': args.n_neighbors},
-        'RFC': {'max_depth': args.max_depth, 'criterion': args.criterion}
+        'SVC': {'kernel': ("linear", "rbf", "poly"), 'gamma': [1, 5, 10, 20]},
+        'KNeighborsClassifier': {'n_neighbors': [3, 5, 10, 15]},
+        'RandomForestClassifier': {
+            'max_depth': [2, 4, 10, None],
+            'criterion': ['gini', 'entropy', 'log_loss']}
     }
 
     try:
         # Preparar la consulta para leer muestras
         db_read, args = get_conn("TestUCI")
         cur = db_read.cursor()
-        cur.execute("SELECT NAMEDATASET, ID, FEATURES, LABEL FROM GestorUCI.Samples WHERE NAMEDATASET = :1",
+        cur.execute("SELECT ID, FEATURES, LABEL FROM GestorUCI.Samples WHERE NAMEDATASET = :1",
                     [args.datasetName])
-        data = cur.fetchall()
+        samples = cur.fetchall()
         cur.execute("SELECT FEAT_SIZE FROM GestorUCI.Dataset WHERE NAME = :1", [args.datasetName])
         dataset_data = cur.fetchone()
 
-        Yo = []
-        Xo = np.ndarray(shape=(len(data), dataset_data[0]), dtype=np.float64)
+        data = {'ID': [], 'FEATURES': [], 'LABEL': []}
+        for id, feature_blob, label in samples:
+            feature_array = np.frombuffer(feature_blob.read(), dtype=np.float64)
+            data['ID'].append(id)
+            data['FEATURES'].append(feature_array)
+            data['LABEL'].append(label)
 
-        for i, row in enumerate(data):
-            Xo[i] = np.frombuffer(row[2].read())
-            Yo.append(row[3])
-        Yo = np.array(Yo)
+        df = pd.DataFrame(data)
+        df.set_index('ID', inplace=True)
+
+        Xo = np.array(df['FEATURES'].tolist())
+        Yo = df['LABEL'].values
+
         db_read.close()
-
-        n_sample = len(Xo)
-
         np.random.seed(0)
         current_time = datetime.now().strftime("%d/%m/%Y, %H:%M")
 
-        cp = params[args.alg]
-        clf = Algorithms[args.alg](**cp)
-        hash_param = hash_items(cp)
         nameDataset = args.datasetName
-        cur = db_write.cursor()
-        cur.execute("DELETE FROM GestorUCI.REPETICIO WHERE NAMEDATASET =:1", [nameDataset])
 
-        # TODO EN VERDAD SE TENIA QUE HACER CON TODOS LOS ALGORITMOS
-        # TODO ALMACENAR CADA
-        #
-        for i in range(numIterations):
-            order = np.random.permutation(n_sample)
-            X = Xo[order]
-            y = Yo[order]
-
-            X_train = X[: int(0.9 * n_sample)]
-            y_train = y[: int(0.9 * n_sample)]
-            y_test = y[int(0.9 * n_sample):]
-            X_test = X[int(0.9 * n_sample):]
-
-            clf.fit(X_train, y_train)
-
-            y_pred = clf.predict(X_test)
-
-            f_score = f1_score(y_test, y_pred, average='macro')
-            acc = accuracy_score(y_test, y_pred)
-            print('Insert number:', i)
-            # def insert_results(db_conn, nameDataset, classifier, parametres, iteration, time, fi_score, accuracy):
-            try:
-                cur.prepare("INSERT INTO GestorUCI.REPETICIO (NAMEDATASET, NUM) VALUES (:1, :2)")
-                cur.execute(None, [nameDataset, i])
+        for k in Algorithms:
+            classificador = Algorithms[k].__name__
+            nomCurt = shortName[classificador]
+            c_params = params[classificador].keys()
+            for idx, values in enumerate(product(*params[classificador].values())):
+                cp = {k: v for k, v in zip(c_params, values) if v is not None}
+                clf = Algorithms[k](**cp)
+                hash_param = hash_items(cp)
+                cur = db_write.cursor()
+                cur.execute("DELETE FROM GestorUCI.EXPERIMENT WHERE NAMEDATASET =:1 AND PAR_HASH =:2 AND NOMCURT =:3",
+                            [nameDataset, hash_param, classificador])
                 cur.prepare(
-                    "INSERT INTO GestorUCI.EXPERIMENT (NAMEDATASET, NOMCURT, PAR_HASH, REP_NUM, DATA, ACCURACY, F_SCORE) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'DD/MM/YYYY HH24:MI'), :6, :7)")
-                cur.execute(None, [nameDataset, args.alg, hash_param, i, current_time, acc, f_score])
-                db_write.commit()
-                print("Resultados insertados correctamente.")
+                    "INSERT INTO GestorUCI.EXPERIMENT (NAMEDATASET, NOMCURT, PAR_HASH, DATA, ACCURACY, F_SCORE) VALUES (:1, :2, :3, TO_DATE(:4, 'DD/MM/YYYY HH24:MI'), :5, :6)")
+                for i in range(numIterations):
+                    X_train, X_test, y_train, y_test = train_test_split(Xo, Yo, test_size=0.1)
 
-            except Exception as e:
-                print(f"Error al insert resultados: {e}")
+                    clf.fit(X_train, y_train)
+
+                    y_pred = clf.predict(X_test)
+
+                    f_score = f1_score(y_test, y_pred, average='macro')
+                    acc = accuracy_score(y_test, y_pred)
+                    try:
+                        cur.execute(None, [nameDataset, nomCurt, hash_param, current_time, acc, f_score])
+                        print("Resultados insertados correctamente.")
+
+                    except Exception as e:
+                        print(f"Error al insert resultados: {e}")
+                db_write.commit()
 
     finally:
         if db_write is not None:
