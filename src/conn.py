@@ -40,3 +40,30 @@ class ImportOptions(ArgumentParser):
     def parse(self):
         return super().parse_args()
 
+
+
+def get_conn(user_fallback: str = "GestorUCI", password_fallback: str = "33"):
+    args = ImportOptions(user_fallback, password_fallback).parse()
+
+    # Inicialitzem el diccionari amb les dades de connexió SSH per fer el tunel
+    ssh_server = {'ssh': args.ssh_tunnel, 'user': args.ssh_user,
+                  'pwd': args.ssh_password, 'port': args.ssh_port} if args.ssh_tunnel is not None else None
+
+    # Cridem el constructor i obrim la connexió
+    db = orcl(user=args.user,
+              passwd=args.passwd,
+              hostname=args.hostname,
+              port=args.port,
+              serviceName=args.serviceName,
+              ssh=ssh_server)
+
+    db.open()
+
+    # Comprovem  que la connexió a la base de dades es correcte
+    if db.testConnection():
+        logging.info("La connexió a {} funciona correctament.".format(args.hostname))
+    else:
+        logging.error("La connexió a {} **NO** funciona correctament.".format(args.hostname))
+        raise SystemExit("error while connecting to the db")
+
+    return db, args
