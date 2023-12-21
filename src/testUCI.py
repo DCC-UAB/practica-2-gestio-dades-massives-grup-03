@@ -83,15 +83,7 @@ if __name__ == "__main__":
             classificador = Algorithms[k].__name__
             nomCurt = shortName[classificador]
             c_params = params[classificador].keys()
-            for idx, values in enumerate(product(*params[classificador].values())):
-                cp = {k: v for k, v in zip(c_params, values) if v is not None}
-                clf = Algorithms[k](**cp)
-                hash_param = hash_items(cp)
-                cur = db_write.cursor()
-                cur.execute("DELETE FROM GestorUCI.EXPERIMENT WHERE NAMEDATASET =:1 AND PAR_HASH =:2 AND NOMCURT =:3",
-                            [nameDataset, hash_param, classificador])
-                cur.prepare(
-                    "INSERT INTO GestorUCI.EXPERIMENT (NAMEDATASET, NOMCURT, PAR_HASH, DATA, ACCURACY, F_SCORE) VALUES (:1, :2, :3, TO_DATE(:4, 'DD/MM/YYYY HH24:MI'), :5, :6)")
+           
                 for i in range(numIterations):
                     X_train, X_test, y_train, y_test = train_test_split(Xo, Yo, test_size=0.1)
 
