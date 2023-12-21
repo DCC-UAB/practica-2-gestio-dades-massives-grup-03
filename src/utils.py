@@ -92,3 +92,4 @@ def generateHashCode( method, **params ):
     code = hash(frozenset(codeList.items()))
 
     return code
+
