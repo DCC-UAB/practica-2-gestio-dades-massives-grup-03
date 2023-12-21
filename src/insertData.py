@@ -12,16 +12,11 @@ Created on 3/10/2022
 
 import sys
 import numpy as np
-
 import logging
-from argparse import ArgumentParser
-
 import oracledb
-
 from itertools import product
 from src.conn import get_conn
 from utils import readVectorDataFile
-from GABDConnect.oracleConnection import oracleConnection as orcl
 
 
 def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwargs):
@@ -67,7 +62,7 @@ def insertVectorDataset(dbConn, nameDataset, fileName, label_pos, *args, **kwarg
 
         confirm = "Datos insertados correctamente en el nuevo dataset"
     else:
-        confirm = "El dataset {nameDataset} ya existe, no se realizaron inserciones"
+        confirm = F"El dataset {nameDataset} ya existe, no se realizaron inserciones"
 
     Algorithms = {
         'Support Vector Machines': 'SVC',

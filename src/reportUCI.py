@@ -9,20 +9,12 @@ Created on 3/10/2022
 @author: Oriol Ramos Terrades (oriol.ramos@cuab.cat)
 @Institution: Computer Science Dept. - Universitat Autònoma de Barcelona
 '''
-import math
 import sys
-import numpy as np
 import json
-
 import logging
-
-import oracledb
-
 from itertools import product
 from src.conn import get_conn, hash_items
-from utils import readVectorDataFile
 from prettytable import PrettyTable
-
 
 
 if __name__ == '__main__':

@@ -2,19 +2,13 @@ import logging
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn import datasets
-from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.neighbors import KNeighborsClassifier as KNN
 from sklearn.metrics import f1_score
-from sklearn.metrics import precision_recall_curve
-# from sklearn.metrics import average_precision_score
 from sklearn.metrics import accuracy_score
 from datetime import datetime
-import socket
 from itertools import product
 from conn import get_conn, hash_items
 
