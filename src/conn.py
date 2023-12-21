@@ -67,3 +67,8 @@ def get_conn(user_fallback: str = "GestorUCI", password_fallback: str = "33"):
         raise SystemExit("error while connecting to the db")
 
     return db, args
+
+    
+def hash_items(cp) -> str:
+    cp_hashable = tuple(sorted(cp.items()))
+    return sha256(json.dumps(cp_hashable).encode('utf-8')).hexdigest()
