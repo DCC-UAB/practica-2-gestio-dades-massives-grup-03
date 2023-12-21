@@ -82,14 +82,3 @@ def loadData(dbms, nameDataset, LoadFeatures=False, **params):
 
 
     return features, classIds
-
-
-def generateHashCode( method, **params ):
-
-    codeList = params.copy()
-    codeList["method"] = method
-
-    code = hash(frozenset(codeList.items()))
-
-    return code
-
