@@ -41,7 +41,6 @@ class ImportOptions(ArgumentParser):
         return super().parse_args()
 
 
-
 def get_conn(user_fallback: str = "GestorUCI", password_fallback: str = "33"):
     args = ImportOptions(user_fallback, password_fallback).parse()
 
@@ -68,7 +67,6 @@ def get_conn(user_fallback: str = "GestorUCI", password_fallback: str = "33"):
 
     return db, args
 
-    
 def hash_items(cp) -> str:
     cp_hashable = tuple(sorted(cp.items()))
     return sha256(json.dumps(cp_hashable).encode('utf-8')).hexdigest()
