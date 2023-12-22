@@ -1,81 +1,108 @@
+import logging
+
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn import datasets
+import pandas as pd
+from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.neighbors import KNeighborsClassifier as KNN
 from sklearn.metrics import f1_score
-from sklearn.metrics import precision_recall_curve
-#from sklearn.metrics import average_precision_score
 from sklearn.metrics import accuracy_score
 from datetime import datetime
-import socket
 from itertools import product
+from conn import get_conn, hash_items
 
 import oracledb
 from GABDConnect.oracleConnection import oracleConnection as orcl
 
-
 if __name__ == "__main__":
-
-    host = socket.gethostname()
-    numIterations = 2
+    """
+        Els únics arguments necessaris seran --datasetName, pel nom del dataset on volem fer els experiments
+        Totes les opcions:
+        --datasetName Iris          
+        --datasetName BreastCancer  
+        --datasetName Ionosphere    
+        --datasetName letter       
+    """
+    db_write, args = get_conn("DevUCI")
+    numIterations = 50
+    shortName = {
+        'SVC': 'SVC',
+        'KNeighborsClassifier': 'KNN',
+        'RandomForestClassifier': 'RFC'
+    }
     Algorithms = {
         'Support Vector Machines': SVC,
         'K nearest Neighbor': KNN,
         'Random Forest': RFC
     }
-    params = { 'SVC' : {'kernel': ("linear", "rbf", "poly"),
-                        'gamma': [1, 5, 10, 20]},
-               'KNeighborsClassifier' : { 'n_neighbors' : [3, 5, 10, 15]},
-               'RandomForestClassifier' : {'max_depth': [2, 4, 10, None],
-                        'criterion': ['gini', 'entropy', 'log_loss']}
-               }
+    params = {
+        'SVC': {'kernel': ("linear", "rbf", "poly"), 'gamma': [1, 5, 10, 20]},
+        'KNeighborsClassifier': {'n_neighbors': [3, 5, 10, 15]},
+        'RandomForestClassifier': {
+            'max_depth': [2, 4, 10, None],
+            'criterion': ['gini', 'entropy', 'log_loss']}
+    }
 
-    iris = datasets.load_iris()
-    Xo = iris.data
-    yo = iris.target
+    try:
+        # Preparar la consulta para leer muestras
+        db_read, args = get_conn("TestUCI")
+        cur = db_read.cursor()
+        cur.execute("SELECT ID, FEATURES, LABEL FROM GestorUCI.Samples WHERE NAMEDATASET = :1",
+                    [args.datasetName])
+        samples = cur.fetchall()
+        cur.execute("SELECT FEAT_SIZE FROM GestorUCI.Dataset WHERE NAME = :1", [args.datasetName])
+        dataset_data = cur.fetchone()
 
-    #Xo = Xo[yo != 0, :2]
-    #yo = yo[yo != 0]
+        data = {'ID': [], 'FEATURES': [], 'LABEL': []}
+        for id, feature_blob, label in samples:
+            feature_array = np.frombuffer(feature_blob.read(), dtype=np.float64)
+            data['ID'].append(id)
+            data['FEATURES'].append(feature_array)
+            data['LABEL'].append(label)
 
-    #digits = datasets.load_digits()
-    #X = digits.data
-    #Y = digits.target
+        df = pd.DataFrame(data)
+        df.set_index('ID', inplace=True)
 
+        Xo = np.array(df['FEATURES'].tolist())
+        Yo = df['LABEL'].values
 
-    n_sample = len(Xo)
+        db_read.close()
+        np.random.seed(0)
+        current_time = datetime.now().strftime("%d/%m/%Y, %H:%M")
 
-    np.random.seed(0)
+        nameDataset = args.datasetName
 
-    current_time = datetime.now().strftime("%d/%m/%Y, %H:%M")
+        for k in Algorithms:
+            classificador = Algorithms[k].__name__
+            nomCurt = shortName[classificador]
+            c_params = params[classificador].keys()
+            for idx, values in enumerate(product(*params[classificador].values())):
+                cp = {k: v for k, v in zip(c_params, values) if v is not None}
+                clf = Algorithms[k](**cp)
+                hash_param = hash_items(cp)
+                cur = db_write.cursor()
+                cur.execute("DELETE FROM GestorUCI.EXPERIMENT WHERE NAMEDATASET =:1 AND PAR_HASH =:2 AND NOMCURT =:3",
+                            [nameDataset, hash_param, classificador])
+                cur.prepare(
+                    "INSERT INTO GestorUCI.EXPERIMENT (NAMEDATASET, NOMCURT, PAR_HASH, DATA, ACCURACY, F_SCORE) VALUES (:1, :2, :3, TO_DATE(:4, 'DD/MM/YYYY HH24:MI'), :5, :6)")
+                for i in range(numIterations):
+                    X_train, X_test, y_train, y_test = train_test_split(Xo, Yo, test_size=0.1)
 
-    for k in Algorithms:
-        classificador = Algorithms[k].__name__
-        c_params = params[classificador].keys()
-        for idx,values in enumerate(product(*params[classificador].values())):
-            cp = {k: v for k, v in zip(c_params, values) if v is not None}
-            clf = Algorithms[k](**cp)
-            for i in range(numIterations):
-                order = np.random.permutation(n_sample)
-                X = Xo[order]
-                y = yo[order].astype(float)
+                    clf.fit(X_train, y_train)
 
-                X_train = X[: int(0.9 * n_sample)]
-                y_train = y[: int(0.9 * n_sample)]
-                X_test = X[int(0.9 * n_sample) :]
-                y_test = y[int(0.9 * n_sample) :]
+                    y_pred = clf.predict(X_test)
 
+                    f_score = f1_score(y_test, y_pred, average='macro')
+                    acc = accuracy_score(y_test, y_pred)
+                    try:
+                        cur.execute(None, [nameDataset, nomCurt, hash_param, current_time, acc, f_score])
+                        print("Resultados insertados correctamente.")
 
-                # Si no executem el script a la màquina main de la pràctica visualitzem els resultats
+                    except Exception as e:
+                        print(f"Error al insert resultados: {e}")
+                db_write.commit()
 
-                # fit the model
-                clf.fit(X_train, y_train)
-
-                y_pred = clf.predict(X_test)
-
-                f1_s = f1_score(y_test, y_pred, average='macro')
-                acc = accuracy_score(y_test, y_pred)
-                print(
-                    "Classificador: {}, Iteracio: {}, paràmetres: {}, time: {}, f-score: {}, accuracy: {}".format(k, i, cp, current_time, f1_s,
-                                                                                                acc))
+    finally:
+        if db_write is not None:
+            db_write.close()
